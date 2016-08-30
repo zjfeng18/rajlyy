@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import requests,time,os,re # requests作为我们的html客户端
 from pyquery import PyQuery as Pq # pyquery来操作dom
+from tools.mysql import Mysql
 # https://segmentfault.com/a/1190000002549756
 # 文章详情页 http://www.0731gch.com/paixie/bianmi/18086.html
 class Getshow(object):
@@ -57,6 +58,58 @@ class Getshow(object):
             f = open(imgpath, 'wb')
             f.write(requests.get(img, stream=True).content)
             f.close()
+    def mysave(self):
+        database=Mysql(host="121.199.48.195", user="root", pwd="rajltool123", db="gcw_rajlyy_com")
+        sDir='d:/test/'
+        #图片地址
+        img_dir = 'img'
+        if os.path.exists(sDir)==False:
+            os.mkdir(sDir)
+        # sName = sDir+str(int(time.time()))+'.txt'
+        print('正在下载'+self.title+'文章')
+        title = self.clearInput(self.title)
+        m = self.clearInput(self.content)
+        #批量替换旧内容中的图片的路径
+        img_patt = re.compile('src=".*?/(\w+\.\w+)"')
+        new_m = img_patt.sub(r'src="./%s/\1"'%img_dir,content)
+
+        try:
+            isexist1 = database.ExecQuery("select * from v9_news where title=%s",title)
+		except Exception as e:
+		    print(e)
+		    pass
+        if isexist1:
+            print(title+'有重复不提交！')
+        else:#无相关记录时提交数据
+            insertbooksql ="insert into v9_news (title,contnent,catid,typeid,keywords,description,posids,url,listorder,status,username,inputtime,updatetime)"
+            insert1 = insertbooksql.format(bookname=bookname, bookurl=bookurl, bookimg=bookimage, bookinfo=bookinfo, bookstar=bookstar, bookno=bookno)
+			print(insert1)
+			try:
+                database.ExecNonQuery(insert1)
+			except Exception as e:
+                print(e)
+				pass
+            #真正下载图片
+            img_patt = re.compile('src="(.*?)"')
+            img_patt = img_patt.findall(m)
+            i =0
+            for img in img_patt:
+                i+=1
+                #图片名称
+                 img_name = os.path.join(img_dir,img.split('/')[-1])
+             #获取图片资源
+                if os.path.exists(sDir+img_dir)==False:
+                    os.mkdir(sDir+img_dir)
+                #合并路径
+                imgpath=os.path.join(sDir,img_name)
+                f = open(imgpath, 'wb')
+                f.write(requests.get(img, stream=True).content)
+                f.close()
+
+
+        # with open(sName,'wb') as file:
+        #     file.write(new_m.encode())
+        # file.close()
 
     def clearInput(self,txt):
         txt=txt.replace('长沙医博肛肠医院','瑞安九龙医院')
@@ -132,9 +185,10 @@ class Getlist(object):
 
 # 测试
 
-# s = Getshow('http://www.0731gch.com/paixie/bianmi/18070.html')
+s = Getshow('http://www.0731gch.com/paixie/bianmi/18070.html')
 # print(s.title)
 # print(s.content)
+s.mysave()
 
 
 # s=Getlist('http://www.0731gch.com/paixie/bianmi/index_26_',2)
@@ -144,9 +198,9 @@ class Getlist(object):
 
 
 
-s=Getlist('http://www.0731gch.com/paixie/bianmi/index_26_',2,2)
+# s=Getlist('http://www.0731gch.com/paixie/bianmi/index_26_',2,2)
 # if not s.has_next_page:
 #     print('没有下一页')
 # else:
 #     print('有下一页')
-s.crawl_all_pages()
+# s.crawl_all_pages()
