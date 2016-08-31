@@ -19,7 +19,7 @@ class Mysql:
 		"""
 		if not self.db:
 			raise (NameError, "没有设置数据库信息")
-		self.conn = pymysql.connect(host=self.host, user=self.user, passwd=self.pwd, db=self.db , port=3306, charset="gbk")
+		self.conn = pymysql.connect(host=self.host, user=self.user, passwd=self.pwd, db=self.db , port=3306, charset="utf8")
 		cur = self.conn.cursor()
 		if not cur:
 			raise (NameError, "连接数据库失败")
@@ -56,6 +56,7 @@ class Mysql:
 			self.cur.execute(sql)
 			self.conn.commit()
 			print('执行语句成功')
+
 		except Exception:  # 出现异常回滚
 			self.conn.rollback()
 			print('执行SQL语句失败：'+sql)

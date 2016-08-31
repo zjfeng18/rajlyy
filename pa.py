@@ -1,7 +1,10 @@
 # -*- coding: utf-8 -*-
 import requests,time,os,re # requests作为我们的html客户端
+import jieba #分词并取关键词
+import jieba.analyse
 from pyquery import PyQuery as Pq # pyquery来操作dom
 from tools.mysql import Mysql
+
 # https://segmentfault.com/a/1190000002549756
 # 文章详情页 http://www.0731gch.com/paixie/bianmi/18086.html
 class Getshow(object):
@@ -58,8 +61,8 @@ class Getshow(object):
             f = open(imgpath, 'wb')
             f.write(requests.get(img, stream=True).content)
             f.close()
-    def mysave(self):
-        database=Mysql(host="121.199.48.195", user="root", pwd="rajltool123", db="gcw_rajlyy_com")
+    def mysave(self,scatid):
+        database=Mysql(host="121.199.48.195", user="root", pwd="rajltool123", db="test")
         sDir='d:/test/'
         #图片地址
         img_dir = 'img'
@@ -71,24 +74,47 @@ class Getshow(object):
         m = self.clearInput(self.content)
         #批量替换旧内容中的图片的路径
         img_patt = re.compile('src=".*?/(\w+\.\w+)"')
-        new_m = img_patt.sub(r'src="./%s/\1"'%img_dir,content)
+        new_m = img_patt.sub(r'src="./%s/\1"'%img_dir,m)
+        isexist1=""
 
         try:
-            isexist1 = database.ExecQuery("select * from v9_news where title=%s",title)
-		except Exception as e:
-		    print(e)
-		    pass
+            isexist1 = database.ExecQuery("select * from v9_news where title='"+title+"'")
+        except Exception as e:
+            print(e)
+            pass
         if isexist1:
             print(title+'有重复不提交！')
         else:#无相关记录时提交数据
-            insertbooksql ="insert into v9_news (title,contnent,catid,typeid,keywords,description,posids,url,listorder,status,username,inputtime,updatetime)"
-            insert1 = insertbooksql.format(bookname=bookname, bookurl=bookurl, bookimg=bookimage, bookinfo=bookinfo, bookstar=bookstar, bookno=bookno)
-			print(insert1)
-			try:
+            content=new_m
+            catid=scatid #保存到的栏目
+            typeid=0
+            tags=jieba.analyse.extract_tags(title, 6)
+            keywords=(",".join(tags))
+            description=self.dom('.art_content').text()[0:200]
+            url=''
+            listorder=0
+            status=99
+            username='admin'
+            inputtime=updatetime=int(time.time())
+            insertbooksql ="insert into v9_news (title,catid,typeid,keywords,description,url,listorder,status,username,inputtime,updatetime) VALUES ('" \
+							"{title}', {catid}, {typeid}, '{keywords}', '{description}', '{url}', {listorder}, {status}, '{username}', '{inputtime}', '{updatetime}')"
+            insert1 = insertbooksql.format(title=title, catid=catid, typeid=typeid, keywords=keywords, description=description,url=url,listorder=listorder,status=status,username=username,inputtime=inputtime,updatetime=updatetime)
+            print(insert1)
+            try:
                 database.ExecNonQuery(insert1)
-			except Exception as e:
-                print(e)
-				pass
+                lastid=database.cur.lastrowid
+                paginationtype = 2
+                groupids_view = ""
+                maxcharperpage = 0
+                template = ""
+                insertbooksql ="insert into v9_news_data (id,content,paginationtype,groupids_view,maxcharperpage,template) VALUES ({lastid}, '{content}', {paginationtype},'{groupids_view}',{maxcharperpage},'{template}')"
+                insert2 = insertbooksql.format(lastid=lastid, content=content, paginationtype=paginationtype,groupids_view=groupids_view,maxcharperpage=maxcharperpage,template=template)
+                database.ExecNonQuery(insert2)
+
+            except Exception as e:
+                print("文章数据库保存出错，错误信息：%s" % (e) )
+                pass
+
             #真正下载图片
             img_patt = re.compile('src="(.*?)"')
             img_patt = img_patt.findall(m)
@@ -96,7 +122,7 @@ class Getshow(object):
             for img in img_patt:
                 i+=1
                 #图片名称
-                 img_name = os.path.join(img_dir,img.split('/')[-1])
+                img_name = os.path.join(img_dir,img.split('/')[-1])
              #获取图片资源
                 if os.path.exists(sDir+img_dir)==False:
                     os.mkdir(sDir+img_dir)
@@ -129,13 +155,18 @@ class Getshow(object):
 #栏目页 http://www.0731gch.com/paixie/bianmi/index_26_2.html
 #getpages限制取几页
 class Getlist(object):
-
-    def __init__(self, zurl , getpages , page=1):
+    #zurl查询网址ttp://www.0731gch.com/paixie/bianmi/index_26_
+    #scatid保存到的栏目id
+    #getpages要采集的页数
+    #page分页码
+    def __init__(self, zurl , scatid ,getpages , page=1):
         self.zurl=zurl
         self.url = zurl+"%d.html" % (page)
+        self.catid = zurl.split('_')[1]
         self.page = page
         self._dom = None
         self.getpages=getpages
+        self.scatid=scatid
 
     @property
     def dom(self):
@@ -157,7 +188,7 @@ class Getlist(object):
 
     def next_page(self): # 把这个蜘蛛杀了， 产生一个新的蜘蛛 抓取下一页。 由于这个本来就是个动词，所以就不加@property了
         if self.has_next_page :
-            self.__init__(zurl=self.zurl,getpages=self.getpages,page=self.page+1)
+            self.__init__(zurl=self.zurl,scatid=self.scatid,getpages=self.getpages,page=self.page+1)
         else:
             return None
 
@@ -168,7 +199,7 @@ class Getlist(object):
         i=1
         for url in self.urls:
             print('此页第%d篇文章采集中' %i)
-            Getshow(url).save()
+            Getshow(url).mysave(self.scatid)
             i+=1
             time.sleep(1)
 
@@ -185,22 +216,29 @@ class Getlist(object):
 
 # 测试
 
-s = Getshow('http://www.0731gch.com/paixie/bianmi/18070.html')
+# s = Getshow('http://www.0731gch.com/paixie/bianmi/18070.html')
 # print(s.title)
 # print(s.content)
-s.mysave()
-
-
+# s.mysave()
+# str='http://www.0731gch.com/paixie/bianmi/index_26_'
+# print(str.split('_')[1])
 # s=Getlist('http://www.0731gch.com/paixie/bianmi/index_26_',2)
 # for url in s.urls:
 #      show =Getshow(url)
 #      print(show.title+':'+url)
 
 
-
-# s=Getlist('http://www.0731gch.com/paixie/bianmi/index_26_',2,2)
+s=Getlist('http://www.0731gch.com/paixie/bianmi/index_26_',693,1,1)
 # if not s.has_next_page:
 #     print('没有下一页')
 # else:
 #     print('有下一页')
-# s.crawl_all_pages()
+s.crawl_all_pages()
+
+#关键词测试
+# content="小明硕士毕业于中国科学院计算所，后在日本京都大学深造"
+# topK=6
+# tags = jieba.analyse.extract_tags(content, topK=topK)
+# print(",".join(tags))
+# 10个 日本京都大学,计算所,小明,深造,硕士,中国科学院,毕业
+#  6个 日本京都大学,计算所,小明,深造,硕士,中国科学院
