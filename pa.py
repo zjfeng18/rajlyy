@@ -69,7 +69,7 @@ class Getshow(object):
         if os.path.exists(sDir)==False:
             os.mkdir(sDir)
         # sName = sDir+str(int(time.time()))+'.txt'
-        print('正在下载'+self.title+'文章')
+        print('正在采集--'+self.title+'--文章')
         title = self.clearInput(self.title)
         m = self.clearInput(self.content)
         #批量替换旧内容中的图片的路径
@@ -83,7 +83,7 @@ class Getshow(object):
             print(e)
             pass
         if isexist1:
-            print(title+'有重复不提交！')
+            print(title+'-----> 有重复不提交！')
         else:#无相关记录时提交数据
             content=new_m
             catid=scatid #保存到的栏目
@@ -109,6 +109,7 @@ class Getshow(object):
                 template = ""
                 insertbooksql ="insert into v9_news_data (id,content,paginationtype,groupids_view,maxcharperpage,template) VALUES ({lastid}, '{content}', {paginationtype},'{groupids_view}',{maxcharperpage},'{template}')"
                 insert2 = insertbooksql.format(lastid=lastid, content=content, paginationtype=paginationtype,groupids_view=groupids_view,maxcharperpage=maxcharperpage,template=template)
+                print(insert2)
                 database.ExecNonQuery(insert2)
 
             except Exception as e:
@@ -205,9 +206,9 @@ class Getlist(object):
 
     def crawl_all_pages(self):
         while True:
-            print(u'正在抓取栏目:%s, 分页:%d ,共需抓 %d 页' % (self.zurl, self.page, self.getpages))
+            print(u'正在抓取栏目页:%s%d.html, 分页:%d ,共需抓 %d 页' % (self.zurl,self.page, self.page, self.getpages))
             self.crawl()
-            if int(self.page) > int(self.getpages) or not self.has_next_page :
+            if int(self.page) >= int(self.getpages) or not self.has_next_page :
             # if not self.has_next_page :
                 print('停止')
                 break
@@ -228,12 +229,14 @@ class Getlist(object):
 #      print(show.title+':'+url)
 
 
-s=Getlist('http://www.0731gch.com/paixie/bianmi/index_26_',693,1,1)
+s=Getlist('http://www.0731gch.com/paixie/bianmi/index_26_',693,3,1)
 # if not s.has_next_page:
 #     print('没有下一页')
 # else:
 #     print('有下一页')
 s.crawl_all_pages()
+# 用while True 循环加time. sleep来控制访问频率吧，最好加上headers ，还有睡眠时间最好随机生成，这样被发现是机器人的概率低点。
+
 
 #关键词测试
 # content="小明硕士毕业于中国科学院计算所，后在日本京都大学深造"
