@@ -62,7 +62,7 @@ class Getshow(object):
             f.write(requests.get(img, stream=True).content)
             f.close()
     def mysave(self,scatid):
-        database=Mysql(host="121.199.48.195", user="root", pwd="rajltool123", db="test")
+        database=Mysql(host="121.199.48.196", user="root", pwd="rajltool321123", db="test")
         sDir='d:/test/'
         #图片地址
         img_dir = 'img'
